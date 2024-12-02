@@ -14,28 +14,84 @@
 /* Create an empty queue */
 struct list_head *q_new()
 {
-    return NULL;
+    struct list_head *new_queue =
+        (struct list_head *) malloc(sizeof(struct list_head));
+    if (!new_queue) {
+        return NULL;
+    }
+    INIT_LIST_HEAD(new_queue);
+    return new_queue;
 }
 
 /* Free all storage used by queue */
-void q_free(struct list_head *head) {}
+void q_free(struct list_head *head)
+{
+    if (!head)
+        return;
+    element_t *entry, *safe;
+    list_for_each_entry_safe (entry, safe, head, list) {
+        q_release_element(entry);  // free entry
+    }
+    free(head);
+}
 
 /* Insert an element at head of queue */
 bool q_insert_head(struct list_head *head, char *s)
 {
+    if (!head) {
+        return false;
+    }
+    element_t *new_node = (element_t *) malloc(sizeof(element_t));
+    if (!new_node) {
+        return false;
+    }
+    new_node->value = strdup(s);
+    if (!new_node->value) {
+        free(new_node);
+        return false;
+    }
+    list_add(&new_node->list, head);
     return true;
 }
 
 /* Insert an element at tail of queue */
 bool q_insert_tail(struct list_head *head, char *s)
 {
+    if (!head) {
+        return false;
+    }
+    element_t *new_node = malloc(sizeof(element_t));
+    if (!new_node) {
+        return false;
+    }
+    new_node->value = strdup(s);
+    if (!new_node->value) {
+        free(new_node);
+        return false;
+    }
+    list_add_tail(&new_node->list, head);
     return true;
 }
 
 /* Remove an element from head of queue */
 element_t *q_remove_head(struct list_head *head, char *sp, size_t bufsize)
 {
-    return NULL;
+    if (!head || head->next == head) {
+        return NULL;
+    }
+    // copy data
+    element_t *first_node = list_entry(head->next, element_t, list);
+    //這一行的作用是獲取鏈結串列中第一個element_t的指標，並將其賦值給 first_node
+
+    if (sp != NULL && bufsize > 0) {
+        strncpy(sp, first_node->value, bufsize - 1);
+        sp[bufsize - 1] = '\0';
+    }
+
+    head->next = first_node->list.next;
+    first_node->list.next->prev = head;
+
+    return first_node;
 }
 
 /* Remove an element from tail of queue */
