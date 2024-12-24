@@ -42,7 +42,9 @@
 
 #define ENOUGH_MEASURE 10000
 #define TEST_TRIES 10
-
+#define DUDECT_ENOUGH_MEASUREMENTS (10000)
+#define DUDECT_NUMBER_PERCENTILES (100)
+#define DUDECT_TESTS (1 + DUDECT_NUMBER_PERCENTILES + 1)
 static t_context_t *t;
 
 /* threshold values for Welch's t-test */
@@ -64,7 +66,10 @@ static void differentiate(int64_t *exec_times,
         exec_times[i] = after_ticks[i] - before_ticks[i];
 }
 
-static void update_statistics(const int64_t *exec_times, uint8_t *classes)
+
+static void update_statistics(const int64_t *exec_times,
+                              uint8_t *classes,
+                              const int64_t *percentiles)
 {
     for (size_t i = 0; i < N_MEASURES; i++) {
         int64_t difference = exec_times[i];
@@ -73,7 +78,16 @@ static void update_statistics(const int64_t *exec_times, uint8_t *classes)
             continue;
 
         /* do a t-test on the execution time */
-        t_push(t, difference, classes[i]);
+        // t_push(t, difference, classes[i]);
+
+        for (size_t crop_index = 0; crop_index < DUDECT_NUMBER_PERCENTILES;
+             crop_index++) {
+            if (difference < percentiles[crop_index]) {
+                t_push(t, difference, classes[i]);
+            }
+        }
+
+
     }
 }
 
@@ -116,6 +130,40 @@ static bool report(void)
     return true;
 }
 
+
+
+static int cmp(const int64_t *a, const int64_t *b)
+{
+    if (*a == *b)
+        return 0;
+    return (*a > *b) ? 1 : -1;
+}
+
+static int64_t percentile(int64_t *a_sorted, double which, size_t size)
+{
+    size_t array_position = (size_t) ((double) size * (double) which);
+    assert(array_position < size);
+    return a_sorted[array_position];
+}
+
+
+
+static void prepare_percentiles(int64_t *exec_times,
+                                int measure_num,
+                                int64_t *percentiles)
+{
+    qsort(exec_times, measure_num, sizeof(int64_t),
+          (int (*)(const void *, const void *)) cmp);
+    for (size_t i = 0; i < DUDECT_NUMBER_PERCENTILES; i++) {
+        percentiles[i] = percentile(
+            exec_times,
+            1 - (pow(0.5, 10 * (double) (i + 1) / DUDECT_NUMBER_PERCENTILES)),
+            measure_num);
+    }
+}
+
+
+
 static bool doit(int mode)
 {
     int64_t *before_ticks = calloc(N_MEASURES + 1, sizeof(int64_t));
@@ -123,19 +171,30 @@ static bool doit(int mode)
     int64_t *exec_times = calloc(N_MEASURES, sizeof(int64_t));
     uint8_t *classes = calloc(N_MEASURES, sizeof(uint8_t));
     uint8_t *input_data = calloc(N_MEASURES * CHUNK_SIZE, sizeof(uint8_t));
+    int64_t *percentiles =
+        calloc(DUDECT_NUMBER_PERCENTILES + 1, sizeof(int64_t));
 
     if (!before_ticks || !after_ticks || !exec_times || !classes ||
-        !input_data) {
+        !input_data || !percentiles) {
         die();
     }
 
     prepare_inputs(input_data, classes);
-
+    /* By recording the cpu timestamps before and after excution,the excution
+     * time is calculated*/
     bool ret = measure(before_ticks, after_ticks, input_data, mode);
-    differentiate(exec_times, before_ticks, after_ticks);
-    update_statistics(exec_times, classes);
-    ret &= report();
 
+    // bool first_time = percentiles[DUDECT_NUMBER_PERCENTILES - 1] == 0;
+    differentiate(exec_times, before_ticks, after_ticks);
+    prepare_percentiles(exec_times, N_MEASURES, percentiles);
+
+    update_statistics(exec_times, classes, percentiles);
+    ret &= report();
+    /* Prepare the data required to perform Welch's t-test */
+    // differentiate(exec_times, before_ticks, after_ticks);
+    // update_statistics(exec_times, classes);
+    // Perform Welch's t-test
+    // ret &= report();
     free(before_ticks);
     free(after_ticks);
     free(exec_times);
@@ -169,9 +228,12 @@ static bool test_const(char *text, int mode)
     free(t);
     return result;
 }
-
-#define DUT_FUNC_IMPL(op) \
-    bool is_##op##_const(void) { return test_const(#op, DUT(op)); }
+/* The content of is_remove_head_const function is inplemented here */
+#define DUT_FUNC_IMPL(op)                \
+    bool is_##op##_const(void)           \
+    {                                    \
+        return test_const(#op, DUT(op)); \
+    }
 
 #define _(x) DUT_FUNC_IMPL(x)
 DUT_FUNCS

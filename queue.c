@@ -152,9 +152,9 @@ bool q_delete_mid(struct list_head *head)
     list_del(mid);
 
     // 若需要釋放節點所佔用的記憶體（依需求處理）
-    // element_t *mid_node = list_entry(mid, element_t, list);
+    element_t *mid_node = list_entry(mid, element_t, list);
 
-    // q_release_element(mid_node);
+    q_release_element(mid_node);
 
     return true;
 

@@ -25,7 +25,12 @@ enum {
     DUT_FUNCS
 #undef _
 };
+/*  1.Using DUT_FUNCS list,along with the macro _and DUT(X),
+    to automatically generate enum member.
+    2.Finally,the generated enum includes identifiers starting with DUT_
+    ,used to represent various function operations,such as DUT_insert_head
 
+*/
 void init_dut();
 void prepare_inputs(uint8_t *input_data, uint8_t *classes);
 bool measure(int64_t *before_ticks,
