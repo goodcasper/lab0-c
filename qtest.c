@@ -42,6 +42,7 @@ extern int show_entropy;
  * OK as long as head field of queue_t structure is in first position in
  * solution code
  */
+#include "list_sort.h"
 #include "queue.h"
 
 #include "console.h"
@@ -74,6 +75,9 @@ static int fail_count = 0;
 static int string_length = MAXSTRING;
 
 static int descend = 0;
+
+
+
 
 #define MIN_RANDSTR_LEN 5
 #define MAX_RANDSTR_LEN 10
@@ -576,8 +580,26 @@ static bool do_size(int argc, char *argv[])
     return ok && !error_check();
 }
 
+
+
+
+
+static int cmp(void *priv, struct list_head *a, struct list_head *b)
+{
+    element_t *l = list_entry(a, element_t, list);
+    element_t *r = list_entry(b, element_t, list);
+    return strcmp(l->value, r->value);
+}
+
+static int cmp_descend(void *priv, struct list_head *a, struct list_head *b)
+{
+    return -1 * cmp(priv, a, b);
+}
+
 bool do_sort(int argc, char *argv[])
 {
+
+
     if (argc != 1) {
         report(1, "%s takes no arguments", argv[0]);
         return false;
@@ -612,8 +634,11 @@ bool do_sort(int argc, char *argv[])
                "number of elements %d is too large, exceeds the limit %d.",
                current->size, MAX_NODES);
 
-    if (current && exception_setup(true))
-        q_sort(current->q, descend);
+    // printf("mode:");
+    // printf("%d", mode);
+    if (current && exception_setup(true)) {
+        list_sort(NULL, current->q, descend ? cmp_descend : cmp);
+    }
     exception_cancel();
     set_noallocate_mode(false);
 
@@ -666,6 +691,17 @@ bool do_sort(int argc, char *argv[])
     q_show(3);
     return ok && !error_check();
 }
+
+// bool do_sort(int argc, char *argv[])
+// {
+//     return _do_sort(argc, argv, 0);
+// }
+
+// bool do_linux_sort(int argc, char *argv[])
+// {
+//     return _do_sort(argc, argv, 1);
+// }
+
 
 static bool do_dm(int argc, char *argv[])
 {
